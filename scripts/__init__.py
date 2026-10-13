@@ -1,0 +1,1 @@
+"""VERDICT helper scripts package."""

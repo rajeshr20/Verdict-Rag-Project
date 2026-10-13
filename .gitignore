@@ -1,0 +1,21 @@
+# Environments & Bytecode
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment variables
+.env
+
+# Storage & Data
+chroma_db/
+eval_chroma_db/
+data/chroma_db/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS Specific
+.DS_Store
+Thumbs.db

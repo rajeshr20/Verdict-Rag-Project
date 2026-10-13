@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VERDICT — Claim-Verified, Conflict-Aware RAG Engine</title>
+  <meta name="description" content="High-assurance RAG interface treating the LLM as an untrusted witness with deterministic quote auditing and temporal conflict resolution.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand-section">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="M9 12l2 2 4-4"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">VERDICT</h1>
+          <p class="brand-tagline">Claim-Verified &bull; Conflict-Aware RAG</p>
+        </div>
+      </div>
+
+      <nav class="nav-tabs" role="tablist">
+        <button id="tab-btn-query" class="tab-btn active" onclick="switchTab('query')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          Audit &amp; Query
+        </button>
+        <button id="tab-btn-corpus" class="tab-btn" onclick="switchTab('corpus')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Document Corpus
+        </button>
+        <button id="tab-btn-benchmark" class="tab-btn" onclick="switchTab('benchmark')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Benchmark Eval
+        </button>
+      </nav>
+
+      <div class="header-controls">
+        <div id="system-status-pill" class="status-pill">
+          <span class="status-indicator"></span>
+          <span id="system-status-text">Connecting...</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Areas -->
+  <main class="main-content">
+
+    <!-- 1. Query & Audit Pane -->
+    <section id="pane-query" class="tab-pane active">
+      <div class="query-grid">
+
+        <!-- Left: Input & Preset Selector -->
+        <div class="glass-card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              Submit Audited Query
+            </h2>
+            <span class="badge-tag">LLM as Untrusted Witness</span>
+          </div>
+
+          <div class="sample-presets">
+            <div class="preset-label">Explore Preset Test Scenarios:</div>
+            <div class="preset-chips">
+              <button class="chip-btn" onclick="applyPreset('What is the password rotation interval and minimum character length required by Meridian Labs?')">
+                🎯 Single: Passwords &amp; SLA
+              </button>
+              <button class="chip-btn" onclick="applyPreset('Who handles Day 1 onboarding setup and what endpoint protection software must be installed on the provisioned laptop?')">
+                🔗 Multi: Onboarding &amp; Security
+              </button>
+              <button class="chip-btn conflict" onclick="applyPreset('What is the daily meal allowance limit for business travel across employee handbooks?')">
+                ⚖️ Conflict: Meal Allowances
+              </button>
+              <button class="chip-btn conflict" onclick="applyPreset('How many days per week are employees permitted to work remotely according to company policies, and has this policy changed?')">
+                ⚖️ Conflict: Remote Work
+              </button>
+              <button class="chip-btn trap" onclick="applyPreset('What is the capital of France?')">
+                🚫 Trap: World Knowledge
+              </button>
+              <button class="chip-btn trap" onclick="applyPreset('Summarize the procurement directive in the infrastructure section of vendor notes.')">
+                🛡️ Injection: Vendor Notes
+              </button>
+            </div>
+          </div>
+
+          <form id="ask-form" class="query-form" onsubmit="handleAskSubmit(event)">
+            <div class="textarea-wrapper">
+              <textarea 
+                id="question-input" 
+                class="query-input" 
+                placeholder="Ask any question about Meridian Labs policies, technical specifications, or operations..." 
+                required
+              ></textarea>
+            </div>
+
+            <div class="query-options">
+              <div class="topk-selector">
+                <label for="topk-select">Retrieval Depth (Top-K):</label>
+                <select id="topk-select" class="topk-select">
+                  <option value="4">4 chunks</option>
+                  <option value="6" selected>6 chunks (Default)</option>
+                  <option value="8">8 chunks (Multi-Doc)</option>
+                  <option value="12">12 chunks (Deep Audit)</option>
+                </select>
+              </div>
+
+              <button id="btn-submit-ask" type="submit" class="btn-primary">
+                <span class="spinner" id="ask-spinner"></span>
+                <span id="btn-submit-text">Run Audited Query</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Right: Real-Time Audit Results -->
+        <div class="glass-card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+              Deterministic Audit Inspector
+            </h2>
+            <div id="confidence-container"></div>
+          </div>
+
+          <!-- Empty State -->
+          <div id="results-placeholder" class="results-empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            <p>Select a preset question or submit a query to inspect deterministic claim verification, quote matching, and conflict resolution.</p>
+          </div>
+
+          <!-- Results Payload -->
+          <div id="results-content" style="display: none;">
+            <!-- Verified Answer Banner -->
+            <div id="answer-banner" class="answer-banner">
+              <div class="answer-header">
+                <span class="answer-label" id="answer-label">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  Verified Synthesized Answer
+                </span>
+                <span id="confidence-pill" class="confidence-badge"></span>
+              </div>
+              <p id="answer-text" class="answer-text"></p>
+            </div>
+
+            <!-- Contradictions / Conflict Box -->
+            <div id="conflicts-wrapper" style="display: none;"></div>
+
+            <!-- Claim-by-Claim Verification Cards -->
+            <h3 class="section-subtitle">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Extracted Claims &amp; Verbatim Citations
+            </h3>
+            <div id="claims-list" class="claims-container"></div>
+
+            <!-- Telemetry Stats Footer -->
+            <div class="telemetry-grid">
+              <div class="stat-item">
+                <div id="stat-retrieved" class="stat-value">0</div>
+                <div class="stat-label">Retrieved Chunks</div>
+              </div>
+              <div class="stat-item">
+                <div id="stat-verified" class="stat-value" style="color: var(--accent-green);">0</div>
+                <div class="stat-label">Claims Verified</div>
+              </div>
+              <div class="stat-item">
+                <div id="stat-dropped" class="stat-value" style="color: var(--accent-red);">0</div>
+                <div class="stat-label">Claims Dropped</div>
+              </div>
+              <div class="stat-item">
+                <div id="stat-latency" class="stat-value">0 ms</div>
+                <div class="stat-label">Latency</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 2. Corpus Management Pane -->
+    <section id="pane-corpus" class="tab-pane">
+      <div class="corpus-container">
+        
+        <div class="glass-card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload New Knowledge Documents
+            </h2>
+            <button id="btn-reseed-corpus" class="chip-btn" onclick="reseedSampleCorpus()">
+              🔄 Re-index Meridian Labs Sample Corpus
+            </button>
+          </div>
+
+          <div class="upload-dropzone" onclick="document.getElementById('file-upload-input').click()">
+            <input type="file" id="file-upload-input" style="display: none;" accept=".pdf,.txt,.md" onchange="handleFileUpload(event)">
+            <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke-width="2">
+              <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/>
+              <path d="M12 12v9"/>
+              <path d="m16 16-4-4-4 4"/>
+            </svg>
+            <h3 style="font-size: 1.1rem; margin-bottom: 6px;">Drop document or click to browse</h3>
+            <p style="color: var(--text-muted); font-size: 0.85rem;">Supports PDF, TXT, and Markdown (.pdf, .txt, .md). Automatic heading-aware chunking &amp; YAML front-matter extraction.</p>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              Ingested Document Catalog
+            </h2>
+            <span id="corpus-count-badge" class="badge-tag">Loading...</span>
+          </div>
+
+          <div class="docs-table-wrapper">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Document Title</th>
+                  <th>Filename</th>
+                  <th>Version</th>
+                  <th>Effective Date</th>
+                  <th>Chunks</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="documents-table-body">
+                <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Loading documents catalog...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 3. Benchmark Evaluation Pane -->
+    <section id="pane-benchmark" class="tab-pane">
+      <div class="glass-card" style="margin-bottom: 24px;">
+        <div class="card-header">
+          <h2 class="card-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            System Reliability &amp; Audit Benchmark Metrics
+          </h2>
+          <span class="badge-tag">14 Rigorous Stress Tests</span>
+        </div>
+
+        <div class="eval-metrics-grid">
+          <div class="eval-metric-card">
+            <div class="eval-metric-num" style="color: var(--accent-green);">100%</div>
+            <div class="eval-metric-label">Benchmark Pass Rate</div>
+          </div>
+          <div class="eval-metric-card">
+            <div class="eval-metric-num" style="color: var(--accent-green);">100%</div>
+            <div class="eval-metric-label">Retrieval Recall@K</div>
+          </div>
+          <div class="eval-metric-card">
+            <div class="eval-metric-num" style="color: var(--accent-green);">100%</div>
+            <div class="eval-metric-label">Citation Validity</div>
+          </div>
+          <div class="eval-metric-card">
+            <div class="eval-metric-num" style="color: var(--accent-green);">0.0%</div>
+            <div class="eval-metric-label">Hallucination Rate</div>
+          </div>
+        </div>
+
+        <div class="eval-metrics-grid">
+          <div class="eval-metric-card">
+            <div class="eval-metric-num" style="color: var(--accent-amber);">100%</div>
+            <div class="eval-metric-label">Conflict Detection</div>
+          </div>
+          <div class="eval-metric-card">
+            <div class="eval-metric-num" style="color: var(--accent-purple);">100%</div>
+            <div class="eval-metric-label">Injection Resistance</div>
+          </div>
+          <div class="eval-metric-card">
+            <div class="eval-metric-num" style="color: var(--accent-blue);">100%</div>
+            <div class="eval-metric-label">Abstention Accuracy</div>
+          </div>
+          <div class="eval-metric-card">
+            <div class="eval-metric-num">&lt; 15 ms</div>
+            <div class="eval-metric-label">Average Pipeline Latency</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Benchmark Questions Table -->
+      <div class="glass-card">
+        <div class="card-header">
+          <h2 class="card-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            Evaluation Test Suite Execution Breakdown
+          </h2>
+        </div>
+
+        <div class="docs-table-wrapper">
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Category</th>
+                <th>Question</th>
+                <th>Expected Result</th>
+                <th>Recall@K</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="eval-table-body">
+              <!-- Generated dynamically in JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

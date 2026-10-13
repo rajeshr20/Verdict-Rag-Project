@@ -114,13 +114,13 @@ flowchart TD
 ### Local Environment
 
 #### Prerequisites
-- Python 3.11 (`python --version` or `py -3.11`)
+- **Python 3.11** (`python --version` or `py -3.11` — pinned to 3.11 via `runtime.txt` / `.python-version`)
 - Git
 
 #### 1. Clone & Setup Virtual Environment
 ```bash
-git clone https://github.com/example/VERDICT.git
-cd VERDICT
+git clone https://github.com/rajeshr20/Verdict-Rag-Project.git
+cd Verdict-Rag-Project
 
 # Create Python 3.11 virtual environment
 py -3.11 -m venv .venv
@@ -130,7 +130,7 @@ py -3.11 -m venv .venv
 # (Linux / macOS)
 # source .venv/bin/activate
 
-# Install dependencies
+# Install dependencies (pinned compatible versions)
 pip install -r requirements.txt
 ```
 
@@ -153,6 +153,7 @@ RETRIEVAL_MIN_SCORE=0.01
 # Generate sample PDF and seed Meridian Labs documents
 python scripts/make_sample_pdf.py
 python scripts/ingest_samples.py
+```
 
 #### 4. Launch the Interactive Streamlit Web UI
 ```bash
@@ -162,6 +163,23 @@ streamlit run streamlit_app.py --server.port 8501
 # make streamlit
 ```
 Access the interactive Streamlit dashboard at: **http://localhost:8501**
+
+---
+
+### Streamlit Cloud Deployment
+
+VERDICT is hardened for one-click deployment on **Streamlit Community Cloud**:
+
+1. **Python Version**: Pinned to **Python 3.11** via `runtime.txt` (`python-3.11`) and `.python-version` (`3.11.9`).
+2. **Dependencies**: `requirements.txt` specifies compatible, pre-verified dependency versions.
+3. **Secrets Management**: Configure your environment variables under **App Settings > Secrets** in Streamlit Cloud:
+   ```toml
+   LLM_PROVIDER = "groq"
+   GROQ_API_KEY = "gsk_your_groq_api_key_here"
+   GROQ_MODEL = "llama-3.3-70b-versatile"
+   ```
+   *Note: At runtime, `streamlit_app.py` automatically bridges `st.secrets` into `os.environ` prior to configuration initialization.*
+4. **Resilient Error Guarding**: If required secrets are missing, VERDICT renders a friendly error message identifying the missing variable names (without ever displaying secret values) and halts safely rather than crashing with unhandled exceptions.
 
 ---
 

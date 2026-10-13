@@ -4,6 +4,11 @@ from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+class LLMConfigError(Exception):
+    """Raised when configuration required specifically for LLM generation is missing."""
+    pass
+
+
 class Settings(BaseSettings):
     """Application configuration loaded from environment variables and .env file."""
 
@@ -27,17 +32,23 @@ class Settings(BaseSettings):
         description="Groq model name (e.g. llama-3.3-70b-versatile, llama-3.1-8b-instant)",
     )
 
-    @model_validator(mode="after")
-    def validate_provider_keys(self) -> "Settings":
-        """Fail fast at startup if Groq is enabled without an API key."""
+    def validate_for_llm(self) -> None:
+        """Validate configuration required specifically when an LLM call is needed.
+
+        Raises:
+            LLMConfigError: If credentials or required parameters for the active provider are missing.
+        """
         if self.LLM_PROVIDER == "groq":
-            key = self.GROQ_API_KEY.get_secret_value() if isinstance(self.GROQ_API_KEY, SecretStr) else str(self.GROQ_API_KEY)
-            if not key or not key.strip():
-                raise ValueError(
-                    "GROQ_API_KEY is required when LLM_PROVIDER='groq'. "
-                    "Please set GROQ_API_KEY in your environment or .env file."
+            key = (
+                self.GROQ_API_KEY.get_secret_value()
+                if isinstance(self.GROQ_API_KEY, SecretStr)
+                else str(self.GROQ_API_KEY)
+            ).strip()
+            if not key:
+                raise LLMConfigError(
+                    "GROQ_API_KEY is missing. "
+                    "Please configure GROQ_API_KEY in your environment, Streamlit secrets, or .env file."
                 )
-        return self
 
     # Embeddings Settings
     EMBEDDING_MODEL: str = Field(

@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 from pathlib import Path
@@ -10,7 +11,16 @@ REPO_ROOT = Path(__file__).resolve().parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from app.config import Settings, get_settings
+# Copy Streamlit Cloud secrets into os.environ if available and not already set
+# Guarded by try/except since st.secrets raises when no secrets file exists locally
+try:
+    for secret_key, secret_val in st.secrets.items():
+        if isinstance(secret_val, (str, int, float, bool)) and secret_key not in os.environ:
+            os.environ[secret_key] = str(secret_val)
+except Exception:
+    pass
+
+from app.config import LLMConfigError, Settings, get_settings
 from app.core.generation.llm import FakeLLM, GroqLLM, LLMError, get_llm_provider
 from app.core.ingestion.chunker import chunk_document
 from app.core.ingestion.loaders import load_from_bytes, load_from_path
@@ -165,9 +175,24 @@ def get_shared_pipeline(
     bm25.build(all_chunks)
 
     retriever = HybridRetriever(vector_store=store, bm25_index=bm25, embedder=embedder, rrf_k=60)
+    effective_key = (
+        api_key
+        or (
+            settings.GROQ_API_KEY.get_secret_value()
+            if hasattr(settings.GROQ_API_KEY, "get_secret_value")
+            else str(settings.GROQ_API_KEY)
+        )
+    ).strip()
+
+    if provider_name == "groq" and not effective_key:
+        raise LLMConfigError(
+            "GROQ_API_KEY is required when LLM_PROVIDER='groq'. "
+            "Please provide it in the sidebar or Streamlit secrets."
+        )
+
     llm = get_llm_provider(
         provider_name=provider_name,
-        api_key=api_key or (settings.GROQ_API_KEY.get_secret_value() if hasattr(settings.GROQ_API_KEY, "get_secret_value") else str(settings.GROQ_API_KEY)),
+        api_key=effective_key,
         model_name=model_name or settings.GROQ_MODEL,
     )
 
@@ -211,8 +236,26 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Sidebar Configuration
-settings = get_settings()
+# Load and validate settings safely
+try:
+    settings = get_settings()
+except Exception as cfg_err:
+    missing_vars: list[str] = []
+    if hasattr(cfg_err, "errors"):
+        for err_item in cfg_err.errors():
+            loc = err_item.get("loc", ())
+            if loc:
+                missing_vars.append(str(loc[-1]))
+    if missing_vars:
+        st.error(
+            "⚠️ **Configuration Error**: Missing or invalid required environment variables: "
+            + ", ".join(f"`{v}`" for v in missing_vars)
+            + ". Please configure them in Streamlit Secrets or your .env file."
+        )
+    else:
+        st.error(f"⚠️ **Configuration Error**: Could not load application settings: {cfg_err}")
+    st.stop()
+
 with st.sidebar:
     st.markdown("### ⚙️ Engine Settings")
 
@@ -276,10 +319,18 @@ with st.sidebar:
             st.success(f"Indexed {n_docs} documents ({n_chunks} chunks)!")
 
 
-# Load Pipeline
-pipeline, store, embedder, bm25 = get_shared_pipeline(
-    provider_choice, api_key_input, model_name_input, embedder_choice, top_k_val, min_score_val
-)
+# Load Pipeline safely
+try:
+    pipeline, store, embedder, bm25 = get_shared_pipeline(
+        provider_choice, api_key_input, model_name_input, embedder_choice, top_k_val, min_score_val
+    )
+except LLMConfigError as llm_err:
+    st.error(
+        f"⚠️ **LLM Configuration Required**: `{llm_err}`\n\n"
+        "Please enter your **Groq API Key** in the sidebar, add `GROQ_API_KEY` to your Streamlit secrets, "
+        "or switch the **LLM Provider** in the sidebar to `fake` for offline testing."
+    )
+    st.stop()
 
 # Ensure corpus has documents on first launch
 if store.count() == 0:

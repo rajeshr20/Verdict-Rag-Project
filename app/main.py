@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from app.api.routes_ask import router as ask_router
 from app.api.routes_documents import router as documents_router
 from app.api.routes_health import router as health_router
-from app.config import Settings, get_settings
+from app.config import LLMConfigError, Settings, get_settings
 from app.core.generation.llm import LLMError, get_llm_provider
 from app.core.pipeline import RAGPipeline
 from app.core.retrieval.bm25_index import BM25Index
@@ -131,6 +131,19 @@ def create_app(custom_settings: Optional[Settings] = None) -> FastAPI:
             content={
                 "error": "Request validation failed",
                 "details": exc.errors(),
+                "request_id": req_id,
+            },
+        )
+
+    @app.exception_handler(LLMConfigError)
+    async def llm_config_error_exception_handler(request: Request, exc: LLMConfigError):
+        req_id = getattr(request.state, "request_id", "unknown")
+        logger.error("[%s] LLM configuration error: %s", req_id, exc)
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "error": "LLM configuration invalid or missing",
+                "detail": str(exc),
                 "request_id": req_id,
             },
         )
